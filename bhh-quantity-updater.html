@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BHH · Quantity Updater</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0c12; --panel:#111420; --panel2:#181c2a; --border:#2a3050;
+    --text:#d4daf0; --muted:#6a7299; --faint:#4a5278;
+    --gold:#c8a84b; --green:#4caf82; --red:#e05555; --purple:#7b5ea7; --amber:#e09a30;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font:14px/1.45 "IBM Plex Sans",-apple-system,Segoe UI,sans-serif}
+  ::selection{background:rgba(200,168,75,.35)}
+
+  .wrap{max-width:1060px;margin:0 auto;padding:20px 18px 80px}
+  header.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  header.brand h1{font-family:"Fraunces",Georgia,serif;font-weight:700;font-size:22px;color:#fff;margin:0}
+  header.brand h1 em{font-style:normal;color:var(--gold)}
+  header.brand .sub{color:var(--muted);font-size:13px}
+
+  /* ---- load screen ---- */
+  #loader{margin-top:26px}
+  .drop{border:1.5px dashed var(--border);border-radius:10px;background:var(--panel);
+    padding:54px 24px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+  .drop.hover{border-color:var(--gold);background:var(--panel2)}
+  .drop b{color:#fff;font-weight:600}
+  .drop .hint{color:var(--muted);font-size:13px;margin-top:8px}
+  .drop .path{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--gold)}
+  #file{display:none}
+  .restorebox{margin-top:14px;background:rgba(76,175,130,.08);border:1px solid var(--green);
+    border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .restorebox .msg{flex:1;min-width:220px}
+  .restorebox b{color:var(--green)}
+
+  /* ---- session bar ---- */
+  #sessionbar{position:sticky;top:0;z-index:30;display:none;margin:14px -4px 12px;
+    background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--border);
+    border-top:2px solid var(--gold);border-radius:8px;padding:10px 14px;
+    display:none;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 6px 18px rgba(0,0,0,.45)}
+  #sessionbar .stat{font-size:13px;color:var(--muted);white-space:nowrap}
+  #sessionbar .stat b{color:var(--text);font-weight:600}
+  #sessionbar .stat.changed b{color:var(--gold);font-size:16px}
+  #sessionbar .save{font-size:12px;color:var(--faint)}
+  #sessionbar .grow{flex:1}
+  button{font:inherit;border-radius:6px;border:1px solid var(--border);background:var(--panel2);
+    color:var(--text);padding:7px 14px;cursor:pointer}
+  button:hover{border-color:var(--muted)}
+  button:focus-visible,input:focus-visible,.chip:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+  button.primary{background:var(--gold);border-color:var(--gold);color:#0a0c12;font-weight:600}
+  button.primary:hover{filter:brightness(1.08)}
+  button.danger{color:var(--red);border-color:rgba(224,85,85,.5)}
+  button:disabled{opacity:.45;cursor:default}
+
+  /* ---- controls row ---- */
+  #controls{display:none;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+  #search{flex:1;min-width:200px;background:var(--panel);border:1px solid var(--border);border-radius:6px;
+    color:var(--text);padding:8px 12px;font:inherit}
+  #search::placeholder{color:var(--faint)}
+  .chip{font-size:12px;padding:5px 11px;border-radius:99px;border:1px solid var(--border);
+    background:var(--panel);color:var(--muted);cursor:pointer;user-select:none}
+  .chip.on{border-color:var(--gold);color:var(--gold);background:rgba(200,168,75,.08)}
+
+  /* ---- nav rail ---- */
+  #navrail{display:none;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+  #navrail a{font-family:"IBM Plex Mono",monospace;font-size:11.5px;text-decoration:none;color:var(--muted);
+    border:1px solid var(--border);background:var(--panel);border-radius:5px;padding:4px 9px}
+  #navrail a:hover{color:var(--gold);border-color:var(--gold)}
+  #navrail a .n{color:var(--faint)}
+
+  /* ---- list ---- */
+  .section-h{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);
+    margin:30px 2px 8px;padding-bottom:6px;border-bottom:1px solid var(--border);
+    display:flex;justify-content:space-between;align-items:baseline}
+  .section-h .cnt{color:var(--faint);letter-spacing:0;text-transform:none;font-size:12px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:7px;margin:6px 0;overflow:hidden}
+  .card.has-change{border-color:rgba(200,168,75,.55)}
+  .card-h{padding:7px 12px 5px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .card-h .num{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--gold);min-width:74px}
+  .card-h .name{font-weight:600;color:#fff}
+  .card-h .badge{font-size:10.5px;border:1px solid var(--border);color:var(--muted);
+    border-radius:4px;padding:1px 6px;letter-spacing:.5px}
+  .vrow{display:grid;grid-template-columns:minmax(120px,200px) 1fr 130px 92px;gap:8px;align-items:center;
+    padding:4px 12px;border-top:1px solid rgba(42,48,80,.5)}
+  .vrow.changed{background:rgba(200,168,75,.07)}
+  .vrow .opt{font-size:13px;color:var(--text)}
+  .vrow .opt .promo{color:var(--purple)}
+  .vrow .sku{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--faint);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .vrow .cur{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--muted);text-align:right}
+  .vrow .cur b{color:var(--text);font-weight:500}
+  .vrow .cur .commit{color:var(--amber)}
+  .vrow input.qty{width:84px;background:var(--panel2);border:1px solid var(--border);border-radius:5px;
+    color:var(--text);padding:5px 8px;font:13px "IBM Plex Mono",monospace;text-align:right}
+  .vrow.changed input.qty{border-color:var(--gold);color:var(--gold)}
+  .vrow input.qty.bad{border-color:var(--red);color:var(--red)}
+
+  .empty{color:var(--muted);padding:30px 10px;text-align:center;display:none}
+  footer{margin-top:40px;font-size:11px;color:var(--faint)}
+  @media (max-width:640px){
+    .vrow{grid-template-columns:1fr 110px 92px}
+    .vrow .sku{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brand">
+    <h1>Beifong&rsquo;s Hit-House <em>&middot; Quantity Updater</em></h1>
+    <span class="sub">inventory CSV in &rarr; counted quantities &rarr; changed rows out</span>
+  </header>
+
+  <!-- ============ LOAD SCREEN ============ -->
+  <div id="loader">
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Load inventory CSV">
+      <div><b>Drop your Shopify inventory export here</b> or click to browse</div>
+      <div class="hint">Export it from <span class="path">Products &rarr; Inventory &rarr; Export</span> &mdash; this is the quantity-only format. A Products export will be rejected.</div>
+    </div>
+    <input type="file" id="file" accept=".csv,text/csv">
+    <div class="restorebox" id="restorebox" style="display:none">
+      <div class="msg" id="restoremsg"></div>
+      <button class="primary" id="restoreBtn">Resume session</button>
+      <button class="danger" id="discardBtn">Discard it</button>
+    </div>
+  </div>
+
+  <!-- ============ SESSION BAR ============ -->
+  <div id="sessionbar">
+    <span class="stat changed"><b id="stChanged">0</b> changed</span>
+    <span class="stat"><b id="stCards">0</b> cards &middot; <b id="stVars">0</b> variants</span>
+    <span class="save" id="stSave"></span>
+    <span class="grow"></span>
+    <button id="reviewBtn">Review changes</button>
+    <button class="primary" id="exportBtn" disabled>Export changed rows</button>
+    <button class="danger" id="endBtn" title="Clears the autosaved session from this browser">End session</button>
+  </div>
+
+  <!-- ============ CONTROLS ============ -->
+  <div id="controls">
+    <input id="search" type="search" placeholder="Search name, number, or SKU&hellip;  (Enter in a quantity box jumps to the next)">
+    <span class="chip on" data-kind="all" tabindex="0">All</span>
+    <span class="chip" data-kind="0" tabindex="0">Singles</span>
+    <span class="chip" data-kind="1" tabindex="0">Runes</span>
+    <span class="chip" data-kind="promo" tabindex="0">Promos</span>
+    <span class="chip" data-kind="2,3" tabindex="0">Tokens &amp; Sealed</span>
+    <span class="chip" data-kind="4,5" tabindex="0">Other</span>
+  </div>
+  <nav id="navrail" aria-label="Jump to section"></nav>
+
+  <div id="list"></div>
+  <div class="empty" id="empty">Nothing matches the current search/filter.</div>
+
+  <footer>Quantities only &mdash; this tool never creates, deletes, or restructures products. Import the exported file via Products &rarr; Inventory &rarr; Import. Autosaves to this browser as you type.</footer>
+</div>
+
+<script>
+'use strict';
+/* ============================ CORE (tested) ============================ */
+var SET_ORDER = ['OGN','OGS','SFD','UNL']; // release order; add new set codes here
+var COND_ORDER = { NMM:0, LPMP:1, HP:2 };
+
+function parseCSV(text){
+  var rows=[],i=0,n=text.length;
+  while(i<n){
+    var row=[];
+    while(i<n&&text[i]!=='\n'){
+      if(text[i]==='"'){
+        i++;var v='';
+        while(i<n){
+          if(text[i]==='"'&&text[i+1]==='"'){v+='"';i+=2;}
+          else if(text[i]==='"'){i++;break;}
+          else v+=text[i++];
+        }
+        row.push(v);if(text[i]===',')i++;
+      }else{
+        var v2='';
+        while(i<n&&text[i]!==','&&text[i]!=='\n')v2+=text[i++];
+        row.push(v2.replace(/\r$/,''));if(text[i]===',')i++;
+      }
+    }
+    if(text[i]==='\n')i++;
+    if(row.some(function(c){return c!=='';}))rows.push(row);
+  }
+  return rows;
+}
+function csvField(s){s=String(s==null?'':s);return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function serializeCSV(header,rows){
+  var out=[header.map(csvField).join(',')];
+  for(var r=0;r<rows.length;r++)out.push(rows[r].map(csvField).join(','));
+  return out.join('\n')+'\n';
+}
+function fingerprint(records){
+  var h=0x811c9dc5;
+  for(var r=0;r<records.length;r++){
+    var s=records[r].sku+'|';
+    for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=(h*0x01000193)>>>0;}
+  }
+  return records.length+'-'+h.toString(16);
+}
+function classifySku(sku){
+  sku=(sku||'').trim();
+  if(!sku)return{kind:5,set:'',num:1e9,letter:'',promo:0,finish:0,cond:0,tail:''};
+  var parts=sku.split('-'),set=parts[0];
+  if(set==='BHH')return{kind:4,set:set,num:1e9,letter:'',promo:0,finish:0,cond:0,tail:sku};
+  var second=parts[1]||'';
+  var promo=sku.indexOf('-PROMO-')!==-1?1:0;
+  var finish=(sku.indexOf('-FOIL-')!==-1||/-FOIL$/.test(sku))?1:0;
+  var condTok=parts[parts.length-1];
+  var cond=COND_ORDER.hasOwnProperty(condTok)?COND_ORDER[condTok]:0;
+  var m;
+  if(second==='SEALED')return{kind:3,set:set,num:parseInt(parts[2],10)||0,letter:'',promo:0,finish:0,cond:0,tail:sku};
+  if(second==='TOKEN')return{kind:2,set:set,num:parseInt(parts[2],10)||0,letter:'',promo:0,finish:0,cond:0,tail:sku};
+  if((m=second.match(/^R(\d+)([a-z]?)$/)))
+    return{kind:1,set:set,num:parseInt(m[1],10),letter:m[2]||'',promo:promo,finish:finish,cond:cond,tail:sku};
+  if((m=second.match(/^(\d+)([a-z]?)\*?of\d+/i)))
+    return{kind:0,set:set,num:parseInt(m[1],10),letter:(m[2]||'').toLowerCase(),promo:promo,finish:finish,cond:cond,tail:sku};
+  return{kind:5,set:set,num:1e9,letter:'',promo:promo,finish:finish,cond:cond,tail:sku};
+}
+function setRank(code){var i=SET_ORDER.indexOf(code);return i===-1?SET_ORDER.length:i;}
+function buildModel(records){
+  var byHandle={},order=[];
+  for(var r=0;r<records.length;r++){
+    var rec=records[r];
+    var key=rec.handle||rec.sku||('row'+rec.idx);
+    if(!byHandle[key]){byHandle[key]={handle:key,title:rec.title,variants:[]};order.push(key);}
+    byHandle[key].variants.push(rec);
+  }
+  var cards=order.map(function(k){
+    var card=byHandle[k];
+    card.variants.forEach(function(v){v.cls=classifySku(v.sku);});
+    card.variants.sort(function(a,b){
+      return a.cls.promo-b.cls.promo||a.cls.finish-b.cls.finish||a.cls.cond-b.cls.cond||a.idx-b.idx;
+    });
+    var c=card.variants[0].cls;
+    card.promoSec=(c.promo===1&&c.kind<=1)?1:0; // promo singles & runes -> own bottom group
+    card.key=[card.promoSec,setRank(c.set),c.set,c.kind,c.num,c.letter,c.promo,c.tail];
+    card.cls=c;
+    return card;
+  });
+  cards.sort(function(a,b){
+    var A=a.key,B=b.key;
+    for(var i=0;i<A.length;i++){if(A[i]<B[i])return -1;if(A[i]>B[i])return 1;}
+    return 0;
+  });
+  var KIND_LABEL=['Singles','Runes','Tokens','Sealed','',''];
+  var sections=[],cur=null;
+  for(var ci=0;ci<cards.length;ci++){
+    var c2=cards[ci].cls,label;
+    if(cards[ci].promoSec)label=c2.set+' \u00b7 Promos';
+    else if(c2.kind===4)label='Beifong\u2019s Essentials';
+    else if(c2.kind===5)label='Other / Unmatched';
+    else label=c2.set+' \u00b7 '+KIND_LABEL[c2.kind];
+    if(!cur||cur.label!==label){cur={label:label,kind:c2.kind,promo:cards[ci].promoSec,cards:[]};sections.push(cur);}
+    cur.cards.push(cards[ci]);
+  }
+  return{sections:sections,cards:cards};
+}
+
+/* ============================ APP STATE ============================ */
+var LS_KEY='bhh-qty-tool-v1';
+var REQUIRED=['Handle','Title','SKU','Location','On hand (current)','On hand (new)'];
+var state=null; // {header, records, model, fp, edits:{sku:val}, fileName}
+var els={};
+['loader','drop','file','restorebox','restoremsg','restoreBtn','discardBtn','sessionbar',
+ 'stChanged','stCards','stVars','stSave','reviewBtn','exportBtn','endBtn','controls','search',
+ 'navrail','list','empty'].forEach(function(id){els[id]=document.getElementById(id);});
+
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function normQty(v){
+  v=String(v==null?'':v).trim();
+  if(v==='')return null;
+  if(!/^\d+$/.test(v))return NaN;
+  return String(parseInt(v,10));
+}
+function loadSaved(){
+  try{var raw=localStorage.getItem(LS_KEY);return raw?JSON.parse(raw):null;}catch(e){return null;}
+}
+function saveSession(){
+  if(!state)return;
+  try{
+    localStorage.setItem(LS_KEY,JSON.stringify({
+      fp:state.fp,fileName:state.fileName,savedAt:Date.now(),csv:state.csvText,edits:state.edits
+    }));
+    els.stSave.textContent='autosaved '+new Date().toLocaleTimeString();
+  }catch(e){
+    // quota: drop the CSV copy, keep edits (resume then needs the file re-dropped)
+    try{
+      localStorage.setItem(LS_KEY,JSON.stringify({
+        fp:state.fp,fileName:state.fileName,savedAt:Date.now(),csv:null,edits:state.edits
+      }));
+      els.stSave.textContent='autosaved (edits only \u2014 file too large to store)';
+    }catch(e2){els.stSave.textContent='autosave unavailable in this browser';}
+  }
+}
+var saveTimer=null;
+function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveSession,400);}
+
+/* ============================ INGEST ============================ */
+function ingest(text,fileName,priorEdits){
+  var rows=parseCSV(text);
+  if(!rows.length){alert('That file is empty or not a CSV.');return;}
+  var header=rows[0];
+  var col={};header.forEach(function(h,i){col[h]=i;});
+  var missing=REQUIRED.filter(function(h){return col[h]==null;});
+  if(missing.length){
+    alert('This doesn\u2019t look like a Shopify INVENTORY export \u2014 missing column(s): '+missing.join(', ')+
+      '.\n\nUse Products \u2192 Inventory \u2192 Export (not the Products export).');
+    return;
+  }
+  var iH=col['Handle'],iT=col['Title'],iS=col['SKU'],iL=col['Location'],
+      iCur=col['On hand (current)'],iCom=col['Committed (not editable)'],
+      iO1n=col['Option1 Name'],iO1v=col['Option1 Value'],iO2v=col['Option2 Value'];
+  var locs={};
+  var records=rows.slice(1).map(function(r,idx){
+    locs[r[iL]]=1;
+    var opt=[];
+    if(iO1v!=null&&r[iO1v]&&r[iO1v]!=='Default Title')opt.push(r[iO1v]);
+    if(iO2v!=null&&r[iO2v])opt.push(r[iO2v]);
+    return{idx:idx,handle:r[iH],title:r[iT],optLabel:opt.join(' \u00b7 '),
+      sku:r[iS],current:(r[iCur]||'').trim(),committed:iCom!=null?(r[iCom]||'').trim():'',raw:r};
+  });
+  var locNames=Object.keys(locs);
+  if(locNames.length>1){
+    if(!confirm('Heads up: this export has '+locNames.length+' locations ('+locNames.join(', ')+
+      ').\nYou said everything should be one location, so this may be a mistake on the Shopify side.\n\nContinue anyway? Each row edits its own location\u2019s quantity.'))return;
+  }
+  state={header:header,col:col,records:records,model:buildModel(records),
+    fp:fingerprint(records),edits:{},csvText:text,fileName:fileName||'inventory.csv'};
+  if(priorEdits){
+    var applied=0;
+    for(var sku in priorEdits)if(Object.prototype.hasOwnProperty.call(priorEdits,sku)){state.edits[sku]=priorEdits[sku];applied++;}
+    if(applied)console.log('Restored '+applied+' edits.');
+  }
+  render();
+  saveSession();
+}
+
+/* ============================ RENDER ============================ */
+var recBySku={};
+function render(){
+  els.loader.style.display='none';
+  els.sessionbar.style.display='flex';
+  els.controls.style.display='flex';
+  els.navrail.style.display='flex';
+  recBySku={};
+  var html='',nav='';
+  state.model.sections.forEach(function(sec,si){
+    var vcount=sec.cards.reduce(function(a,c){return a+c.variants.length;},0);
+    nav+='<a href="#sec'+si+'">'+esc(sec.label)+' <span class="n">'+sec.cards.length+'</span></a>';
+    html+='<div class="section-h" id="sec'+si+'" data-kind="'+sec.kind+'"><span>'+esc(sec.label)+
+          '</span><span class="cnt">'+sec.cards.length+' cards \u00b7 '+vcount+' variants</span></div>';
+    sec.cards.forEach(function(card){
+      var c=card.cls;
+      var numLabel=c.kind===0?('#'+String(c.num).padStart(3,'0')+(c.letter||'')) :
+                   c.kind===1?card.variants[0].sku.split('-')[1] : '';
+      html+='<div class="card" data-kind="'+c.kind+'" data-promo="'+(card.promoSec?1:0)+'" data-search="'+esc((card.title+' '+card.variants.map(function(v){return v.sku;}).join(' ')).toLowerCase())+'">'+
+        '<div class="card-h">'+(numLabel?'<span class="num">'+esc(numLabel)+'</span>':'')+
+        '<span class="name">'+esc(card.title)+'</span>'+
+        (c.promo?'<span class="badge">PROMO</span>':'')+'</div>';
+      card.variants.forEach(function(v){
+        recBySku[v.sku||('row'+v.idx)]=v;
+        var skuKey=v.sku||('row'+v.idx);
+        var edited=state.edits[skuKey];
+        var cur=v.current===''?'0':v.current;
+        var val=edited!=null?edited:cur;
+        var changed=edited!=null&&normQty(edited)!==normQty(cur);
+        var committed=parseInt(v.committed,10)>0?' <span class="commit" title="In unshipped orders \u2014 still physically with you">'+esc(v.committed)+' committed</span>':'';
+        var opt=v.optLabel||'\u2014';
+        if(v.cls.promo)opt='<span class="promo">'+esc(opt)+'</span>';else opt=esc(opt);
+        html+='<div class="vrow'+(changed?' changed':'')+'" data-sku="'+esc(skuKey)+'">'+
+          '<span class="opt">'+opt+'</span>'+
+          '<span class="sku">'+esc(v.sku)+'</span>'+
+          '<span class="cur">on hand <b>'+esc(cur)+'</b>'+committed+'</span>'+
+          '<input class="qty" inputmode="numeric" autocomplete="off" value="'+esc(val)+'" aria-label="New quantity for '+esc(v.sku)+'">'+
+          '</div>';
+      });
+      html+='</div>';
+    });
+  });
+  els.list.innerHTML=html;
+  els.navrail.innerHTML=nav;
+  els.stCards.textContent=state.model.cards.length;
+  els.stVars.textContent=state.records.length;
+  updateChangedCount();
+  applyFilters();
+}
+
+function updateChangedCount(){
+  var n=0;
+  for(var sku in state.edits)if(Object.prototype.hasOwnProperty.call(state.edits,sku)){
+    var rec=recBySku[sku];if(!rec)continue;
+    var nv=normQty(state.edits[sku]);
+    if(nv!=null&&!isNaN(nv)&&nv!==normQty(rec.current===''?'0':rec.current))n++;
+  }
+  els.stChanged.textContent=n;
+  els.exportBtn.disabled=n===0;
+  return n;
+}
+
+/* ============================ EVENTS ============================ */
+// quantity edits — delegated
+els.list.addEventListener('input',function(e){
+  var inp=e.target;
+  if(!inp.classList.contains('qty'))return;
+  var row=inp.closest('.vrow'),sku=row.getAttribute('data-sku'),rec=recBySku[sku];
+  var nv=normQty(inp.value);
+  inp.classList.toggle('bad',typeof nv==='number'&&isNaN(nv));
+  if(inp.value.trim()==='')delete state.edits[sku];
+  else state.edits[sku]=inp.value.trim();
+  var cur=normQty(rec.current===''?'0':rec.current);
+  var changed=nv!=null&&!isNaN(nv)&&nv!==cur;
+  row.classList.toggle('changed',changed);
+  var card=row.closest('.card');
+  card.classList.toggle('has-change',!!card.querySelector('.vrow.changed'));
+  updateChangedCount();
+  scheduleSave();
+});
+// focus = select all, for fast overtyping
+els.list.addEventListener('focusin',function(e){
+  if(e.target.classList.contains('qty'))e.target.select();
+});
+// Enter / arrows walk the visible inputs
+els.list.addEventListener('keydown',function(e){
+  if(!e.target.classList.contains('qty'))return;
+  var dir=0;
+  if(e.key==='Enter'||e.key==='ArrowDown')dir=e.shiftKey&&e.key==='Enter'?-1:1;
+  else if(e.key==='ArrowUp')dir=-1;
+  else return;
+  e.preventDefault();
+  var inputs=Array.prototype.filter.call(document.querySelectorAll('.qty'),function(el){
+    return el.offsetParent!==null;
+  });
+  var i=inputs.indexOf(e.target),next=inputs[i+dir];
+  if(next){next.focus();next.scrollIntoView({block:'center'});}
+});
+
+// search + kind chips + review toggle
+var activeKinds=null,reviewOnly=false;
+function applyFilters(){
+  var q=els.search.value.trim().toLowerCase();
+  var any=false;
+  document.querySelectorAll('#list .card').forEach(function(card){
+    var ok=true;
+    var isPromo=card.getAttribute('data-promo')==='1';
+    if(activeKinds==='promo'){if(!isPromo)ok=false;}
+    else if(activeKinds){if(activeKinds.indexOf(card.getAttribute('data-kind'))===-1||isPromo)ok=false;}
+    if(ok&&q&&card.getAttribute('data-search').indexOf(q)===-1)ok=false;
+    if(ok&&reviewOnly&&!card.classList.contains('has-change'))ok=false;
+    card.style.display=ok?'':'none';
+    if(ok)any=true;
+  });
+  document.querySelectorAll('#list .section-h').forEach(function(h){
+    var el=h.nextElementSibling,vis=false;
+    while(el&&!el.classList.contains('section-h')){
+      if(el.classList.contains('card')&&el.style.display!=='none'){vis=true;break;}
+      el=el.nextElementSibling;
+    }
+    h.style.display=vis?'':'none';
+  });
+  els.empty.style.display=any?'none':'block';
+}
+els.search.addEventListener('input',applyFilters);
+els.controls.addEventListener('click',function(e){
+  var chip=e.target.closest('.chip');if(!chip)return;
+  document.querySelectorAll('.chip').forEach(function(c){c.classList.remove('on');});
+  chip.classList.add('on');
+  var k=chip.getAttribute('data-kind');
+  activeKinds=k==='all'?null:(k==='promo'?'promo':k.split(','));
+  applyFilters();
+});
+els.controls.addEventListener('keydown',function(e){
+  if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('chip')){e.preventDefault();e.target.click();}
+});
+els.reviewBtn.addEventListener('click',function(){
+  reviewOnly=!reviewOnly;
+  els.reviewBtn.textContent=reviewOnly?'Show everything':'Review changes';
+  applyFilters();
+});
+
+/* ============================ EXPORT ============================ */
+els.exportBtn.addEventListener('click',function(){
+  var iNew=state.col['On hand (new)'];
+  var out=[],bad=0;
+  for(var r=0;r<state.records.length;r++){
+    var rec=state.records[r],sku=rec.sku||('row'+rec.idx);
+    if(state.edits[sku]==null)continue;
+    var nv=normQty(state.edits[sku]);
+    if(nv==null)continue;
+    if(isNaN(nv)){bad++;continue;}
+    if(nv===normQty(rec.current===''?'0':rec.current))continue;
+    var row=rec.raw.slice();
+    row[iNew]=nv;
+    out.push(row);
+  }
+  if(bad&&!confirm(bad+' edit(s) aren\u2019t valid whole numbers and will be left out. Export the rest?'))return;
+  if(!out.length){alert('No valid changes to export.');return;}
+  var csv=serializeCSV(state.header,out);
+  var d=new Date(),pad=function(x){return String(x).padStart(2,'0');};
+  var name='inventory_update_'+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+'.csv';
+  var blob=new Blob([csv],{type:'text/csv'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},500);
+  els.stSave.textContent='exported '+out.length+' row(s) \u2192 '+name;
+});
+
+/* ============================ SESSION LIFECYCLE ============================ */
+els.endBtn.addEventListener('click',function(){
+  var n=updateChangedCount();
+  if(!confirm('End the session and clear the autosave from this browser?'+(n?' You have '+n+' unexported change(s).':'')))return;
+  try{localStorage.removeItem(LS_KEY);}catch(e){}
+  location.reload();
+});
+
+/* ============================ FILE LOADING ============================ */
+function readFile(file,priorEdits){
+  var rd=new FileReader();
+  rd.onload=function(){ingest(String(rd.result),file.name,priorEdits);};
+  rd.onerror=function(){alert('Could not read that file.');};
+  rd.readAsText(file);
+}
+els.drop.addEventListener('click',function(){els.file.click();});
+els.drop.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();els.file.click();}});
+els.file.addEventListener('change',function(){if(els.file.files[0])readFile(els.file.files[0],pendingEdits());});
+['dragover','dragenter'].forEach(function(ev){els.drop.addEventListener(ev,function(e){e.preventDefault();els.drop.classList.add('hover');});});
+['dragleave','drop'].forEach(function(ev){els.drop.addEventListener(ev,function(e){e.preventDefault();els.drop.classList.remove('hover');});});
+els.drop.addEventListener('drop',function(e){
+  var f=e.dataTransfer.files&&e.dataTransfer.files[0];
+  if(f)readFile(f,pendingEdits());
+});
+
+// If a saved session exists, offer resume. Edits apply by SKU, so even a
+// slightly newer export gets them (a mismatch is reported, not silently lost).
+var saved=loadSaved();
+function pendingEdits(){return saved&&saved.edits&&Object.keys(saved.edits).length?saved.edits:null;}
+if(saved&&saved.edits&&Object.keys(saved.edits).length){
+  var when=saved.savedAt?new Date(saved.savedAt).toLocaleString():'earlier';
+  els.restoremsg.innerHTML='<b>Unfinished session found</b> \u2014 '+Object.keys(saved.edits).length+
+    ' edit(s) from '+esc(when)+(saved.fileName?' on <span style="font-family:\'IBM Plex Mono\',monospace;font-size:12px">'+esc(saved.fileName)+'</span>':'')+
+    (saved.csv?'.':'. The file itself wasn\u2019t stored \u2014 drop the same export above and the edits will re-apply by SKU.');
+  els.restorebox.style.display='flex';
+  els.restoreBtn.style.display=saved.csv?'':'none';
+  els.restoreBtn.addEventListener('click',function(){ingest(saved.csv,saved.fileName,saved.edits);});
+  els.discardBtn.addEventListener('click',function(){
+    try{localStorage.removeItem(LS_KEY);}catch(e){}
+    saved=null;els.restorebox.style.display='none';
+  });
+}
+</script>
+</body>
+</html>
